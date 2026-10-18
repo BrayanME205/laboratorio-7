@@ -1,0 +1,48 @@
+package cr.ac.ucr.paraiso.ie.c5h753.expresofast.controller;
+
+import cr.ac.ucr.paraiso.ie.c5h753.expresofast.dto.EmpresaRequestDTO;
+import cr.ac.ucr.paraiso.ie.c5h753.expresofast.dto.EmpresaResponseDTO;
+import cr.ac.ucr.paraiso.ie.c5h753.expresofast.service.EmpresaLogisticaService;
+import jakarta.validation.Valid;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/empresas")
+public class EmpresaLogisticaController {
+
+    private final EmpresaLogisticaService empresaService;
+
+    public EmpresaLogisticaController(EmpresaLogisticaService empresaService) {
+        this.empresaService = empresaService;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<EmpresaResponseDTO>> listarEmpresas() {
+        return ResponseEntity.ok(empresaService.listarEmpresas());
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<EmpresaResponseDTO> obtenerEmpresa(@PathVariable Integer id) {
+        return ResponseEntity.ok(empresaService.obtenerEmpresa(id));
+    }
+
+    @PostMapping
+    public ResponseEntity<EmpresaResponseDTO> crearEmpresa(@Valid @RequestBody EmpresaRequestDTO request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(empresaService.crearEmpresa(request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarEmpresa(@PathVariable Integer id) {
+        empresaService.eliminarEmpresa(id);
+        return ResponseEntity.noContent().build();
+    }
+}

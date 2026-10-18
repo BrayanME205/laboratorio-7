@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExpresoFast - Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="topbar">
+        <h1>ExpresoFast</h1>
+        <div class="topbar-user">
+            <span id="user-name"></span>
+            <span id="user-roles"></span>
+            <button id="logout-button" class="btn btn-secondary btn-small" type="button">Sign out</button>
+        </div>
+    </header>
+
+    <main class="container">
+        <nav class="tabs">
+            <button id="tab-shipments" class="tab active" type="button" data-tab="shipments">Shipments</button>
+            <button id="tab-fleet" class="tab hidden" type="button" data-tab="fleet">Fleet</button>
+        </nav>
+
+        <div id="message" class="alert hidden" role="status"></div>
+
+        <section id="section-shipments">
+            <div id="create-panel" class="panel hidden">
+                <h2>New shipment</h2>
+                <form id="shipment-form" novalidate>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="trackingCode">Tracking code</label>
+                            <input id="trackingCode" type="text" placeholder="EXP-1234" required>
+                        </div>
+                        <div class="field">
+                            <label for="destination">Destination address</label>
+                            <input id="destination" type="text" required>
+                        </div>
+                        <div class="field">
+                            <label for="weightKg">Weight (kg)</label>
+                            <input id="weightKg" type="number" min="0.01" step="0.01" required>
+                        </div>
+                        <div class="field">
+                            <label for="distanceKm">Distance (km, for fee estimate)</label>
+                            <input id="distanceKm" type="number" min="0.1" step="0.1">
+                        </div>
+                        <div class="field">
+                            <label for="cost">Cost (CRC)</label>
+                            <input id="cost" type="number" min="0" step="0.01" required>
+                        </div>
+                        <div class="field">
+                            <label for="vehicleId">Vehicle ID</label>
+                            <input id="vehicleId" type="number" min="1" required>
+                        </div>
+                        <div class="field">
+                            <label for="driverId">Driver ID</label>
+                            <input id="driverId" type="number" min="1" required>
+                        </div>
+                    </div>
+                    <button id="estimate-button" class="btn btn-secondary" type="button">Estimate fee</button>
+                    <button class="btn" type="submit">Create shipment</button>
+                </form>
+            </div>
+
+            <div class="panel">
+                <h2>Shipments</h2>
+                <div id="shipment-cards" class="cards"></div>
+            </div>
+        </section>
+
+        <section id="section-fleet" class="hidden">
+            <div class="panel">
+                <h2>Register vehicle</h2>
+                <form id="vehicle-form" novalidate>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="plate">License plate</label>
+                            <input id="plate" type="text" placeholder="ABC-123" required>
+                        </div>
+                        <div class="field">
+                            <label for="brand">Brand</label>
+                            <input id="brand" type="text" required>
+                        </div>
+                        <div class="field">
+                            <label for="model">Model</label>
+                            <input id="model" type="text" required>
+                        </div>
+                        <div class="field">
+                            <label for="capacityKg">Capacity (kg)</label>
+                            <input id="capacityKg" type="number" min="1" step="0.01" required>
+                        </div>
+                        <div class="field">
+                            <label for="companyId">Company ID</label>
+                            <input id="companyId" type="number" min="1" required>
+                        </div>
+                    </div>
+                    <button class="btn" type="submit">Register vehicle</button>
+                </form>
+            </div>
+
+            <div class="panel">
+                <h2>Vehicles</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th><th>Plate</th><th>Brand / model</th><th>Capacity (kg)</th>
+                                <th>Company</th><th>Driver</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="vehicle-rows"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Companies</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>ID</th><th>Name</th><th>Legal ID</th><th>Phone</th></tr>
+                        </thead>
+                        <tbody id="company-rows"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="audit-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="audit-title">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="audit-title">Audit log</h2>
+                <button id="audit-close" class="modal-close" type="button" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="filters">
+                    <div class="field">
+                        <label for="audit-from">From</label>
+                        <input id="audit-from" type="date">
+                    </div>
+                    <div class="field">
+                        <label for="audit-to">To</label>
+                        <input id="audit-to" type="date">
+                    </div>
+                    <button id="audit-clear" class="btn btn-secondary btn-small" type="button">Clear filter</button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Change</th><th>Date / time</th><th>User</th><th>Notes</th></tr>
+                        </thead>
+                        <tbody id="audit-rows"></tbody>
+                    </table>
+                </div>
+                <p id="audit-empty" class="empty-state hidden">No entries for the selected range.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
