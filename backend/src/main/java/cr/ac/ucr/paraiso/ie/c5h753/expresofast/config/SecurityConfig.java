@@ -78,7 +78,7 @@ public class SecurityConfig {
                                 .hasAnyRole(ADMIN, OPERADOR, CONDUCTOR)
                         .requestMatchers(HttpMethod.GET, "/api/envios/tarifa").hasAnyRole(ADMIN, OPERADOR)
                         .requestMatchers(HttpMethod.POST, "/api/envios").hasAnyRole(ADMIN, OPERADOR)
-                        .requestMatchers(HttpMethod.PATCH, "/api/envios/*/estado").hasAnyRole(ADMIN, CONDUCTOR)
+                        .requestMatchers(HttpMethod.PATCH, "/api/envios/*/estado").hasAnyRole(ADMIN, OPERADOR, CONDUCTOR)
                         .requestMatchers(HttpMethod.PATCH, "/api/envios/*/cancelar").hasAnyRole(ADMIN, OPERADOR)
                         .requestMatchers(HttpMethod.GET, "/api/envios/*/bitacora").hasAnyRole(ADMIN, OPERADOR)
                         .requestMatchers(HttpMethod.GET, "/api/envios/*").hasAnyRole(ADMIN, OPERADOR, CONDUCTOR)

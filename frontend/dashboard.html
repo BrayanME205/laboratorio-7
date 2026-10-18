@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExpresoFast - Consola de Operación</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body data-page="dashboard">
+    <a class="skip-link" href="#enviosGrid">Saltar al contenido</a>
+
+    <header class="topbar">
+        <h1 class="logo">Expreso<span>Fast</span></h1>
+        <div class="topbar-user">
+            <span id="userName" class="user-name"></span>
+            <span id="userRoles"></span>
+            <button id="logoutButton" class="btn btn-secondary btn-small" type="button">Cerrar sesión</button>
+        </div>
+    </header>
+
+    <nav class="filter-nav" aria-label="Filtrar envíos por estado">
+        <button type="button" class="filter-btn active" data-filter="TODOS" aria-pressed="true">Todos</button>
+        <button type="button" class="filter-btn" data-filter="PENDIENTE" aria-pressed="false">Pendientes</button>
+        <button type="button" class="filter-btn" data-filter="EN_TRANSITO" aria-pressed="false">En Tránsito</button>
+        <button type="button" class="filter-btn" data-filter="ENTREGADO" aria-pressed="false">Entregados</button>
+    </nav>
+
+    <div id="layout" class="layout">
+        <main class="main-content">
+            <div id="message" class="alert" role="status" aria-live="polite"></div>
+
+            <section id="kpiSection" class="kpi-grid" aria-label="Indicadores clave">
+                <article class="kpi-card">
+                    <h2>Total de envíos</h2>
+                    <p id="kpiTotal" class="kpi-value">0</p>
+                </article>
+                <article class="kpi-card">
+                    <h2>Vehículos activos</h2>
+                    <p id="kpiVehiculos" class="kpi-value">0</p>
+                </article>
+                <article class="kpi-card">
+                    <h2>Paquetes entregados</h2>
+                    <p id="kpiEntregados" class="kpi-value">0</p>
+                </article>
+            </section>
+
+            <section id="createSection" class="panel hidden" aria-labelledby="createTitle">
+                <h2 id="createTitle">Nuevo envío</h2>
+                <form id="shipmentForm" novalidate>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="trackingCode">Código de rastreo</label>
+                            <input id="trackingCode" type="text" placeholder="EXP-1234" required>
+                        </div>
+                        <div class="field">
+                            <label for="destination">Dirección de destino</label>
+                            <input id="destination" type="text" required>
+                        </div>
+                        <div class="field">
+                            <label for="weightKg">Peso (kg)</label>
+                            <input id="weightKg" type="number" min="0.01" step="0.01" required>
+                        </div>
+                        <div class="field">
+                            <label for="distanceKm">Distancia (km, para estimar tarifa)</label>
+                            <input id="distanceKm" type="number" min="0.1" step="0.1">
+                        </div>
+                        <div class="field">
+                            <label for="cost">Costo (CRC)</label>
+                            <input id="cost" type="number" min="0" step="0.01" required>
+                        </div>
+                        <div class="field">
+                            <label for="vehicleId">ID de vehículo</label>
+                            <input id="vehicleId" type="number" min="1" required>
+                        </div>
+                        <div class="field">
+                            <label for="driverId">ID de conductor</label>
+                            <input id="driverId" type="number" min="1" required>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button id="estimateButton" class="btn btn-secondary" type="button">Estimar tarifa</button>
+                        <button class="btn" type="submit">Crear envío</button>
+                    </div>
+                </form>
+            </section>
+
+            <section id="enviosSection" aria-labelledby="enviosTitle">
+                <h2 id="enviosTitle" class="section-title">Envíos</h2>
+                <div id="enviosGrid" class="cards" tabindex="-1"></div>
+            </section>
+
+            <section id="fleetSection" class="panel hidden" aria-labelledby="fleetTitle">
+                <details>
+                    <summary id="fleetTitle">Gestión de flota (solo administrador)</summary>
+
+                    <h3>Registrar vehículo</h3>
+                    <form id="vehicleForm" novalidate>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="plate">Placa</label>
+                                <input id="plate" type="text" placeholder="ABC-123" required>
+                            </div>
+                            <div class="field">
+                                <label for="brand">Marca</label>
+                                <input id="brand" type="text" required>
+                            </div>
+                            <div class="field">
+                                <label for="model">Modelo</label>
+                                <input id="model" type="text" required>
+                            </div>
+                            <div class="field">
+                                <label for="capacityKg">Capacidad (kg)</label>
+                                <input id="capacityKg" type="number" min="1" step="0.01" required>
+                            </div>
+                            <div class="field">
+                                <label for="companyId">ID de empresa</label>
+                                <input id="companyId" type="number" min="1" required>
+                            </div>
+                        </div>
+                        <button class="btn" type="submit">Registrar vehículo</button>
+                    </form>
+
+                    <h3>Vehículos</h3>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Placa</th>
+                                    <th>Marca / modelo</th>
+                                    <th>Capacidad (kg)</th>
+                                    <th>Empresa</th>
+                                    <th>Conductor</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="vehicleRows"></tbody>
+                        </table>
+                    </div>
+
+                    <h3>Empresas</h3>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombre</th>
+                                    <th>Cédula jurídica</th>
+                                    <th>Teléfono</th>
+                                </tr>
+                            </thead>
+                            <tbody id="companyRows"></tbody>
+                        </table>
+                    </div>
+                </details>
+            </section>
+        </main>
+
+        <aside id="auditAside" class="aside hidden" aria-labelledby="auditTitle">
+            <h2 id="auditTitle">Bitácora de auditoría</h2>
+            <p id="auditHint" class="empty-state">Presione «Ver bitácora» en un envío para consultar su historial.</p>
+            <div id="auditContent" class="hidden">
+                <div class="filters">
+                    <div class="field">
+                        <label for="auditFrom">Desde</label>
+                        <input id="auditFrom" type="date">
+                    </div>
+                    <div class="field">
+                        <label for="auditTo">Hasta</label>
+                        <input id="auditTo" type="date">
+                    </div>
+                    <button id="auditClear" class="btn btn-secondary btn-small" type="button">Limpiar</button>
+                </div>
+                <ul id="auditList" class="audit-list"></ul>
+                <p id="auditEmpty" class="empty-state hidden">Sin registros para el rango seleccionado.</p>
+            </div>
+        </aside>
+    </div>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 ExpresoFast. Universidad de Costa Rica, Sede del Atlántico. Todos los derechos reservados.</p>
+        <p><a href="mailto:soporte@expresofast.cr">soporte@expresofast.cr</a> · <a href="#enviosGrid">Volver a los
+                envíos</a></p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

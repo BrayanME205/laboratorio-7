@@ -5,8 +5,8 @@ Carrera de Informática Empresarial
 **Curso:** IF0009 – Desarrollo de Software IV
 **Profesor:** Mag. Jonathan Granados C.
 **Semestre:** II-2026
-**Laboratorios:** 6 (Seguridad JWT, RBAC, DTOs, Bitácora) y 7 (Suite de pruebas y cobertura JaCoCo)
-**Estudiante:** _[Nombre completo]_
+**Laboratorios:** 6, 7 y 8 
+**Estudiante:** Brayan Murillo Estrada
 **Carné:** c5h753
 
 ---
@@ -97,7 +97,7 @@ cd frontend
 python -m http.server 5500
 ```
 
-Abra `http://127.0.0.1:5500/login.html`. (También funciona con la extensión Live Server de VS Code.)
+Abra `http://127.0.0.1:5500/index.html`. (También funciona con la extensión Live Server de VS Code.)
 La URL del backend se configura en la constante `API_BASE_URL` de `app.js` y `login.html`.
 
 ## 6. Matriz de permisos (RBAC)
@@ -108,7 +108,7 @@ La URL del backend se configura en la constante `API_BASE_URL` de `app.js` y `lo
 | `/api/envios/optimizados` | GET | ADMIN, OPERADOR, CONDUCTOR |
 | `/api/envios/{id}` | GET | ADMIN, OPERADOR, CONDUCTOR |
 | `/api/envios` | POST | ADMIN, OPERADOR |
-| `/api/envios/{id}/estado` | PATCH | ADMIN, CONDUCTOR |
+| `/api/envios/{id}/estado` | PATCH | ADMIN, OPERADOR, CONDUCTOR |
 | `/api/envios/{id}/cancelar` | PATCH | ADMIN, OPERADOR |
 | `/api/envios/{id}/bitacora` | GET | ADMIN, OPERADOR |
 | `/api/envios/tarifa` | GET | ADMIN, OPERADOR |

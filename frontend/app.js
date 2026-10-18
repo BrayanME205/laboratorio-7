@@ -1,43 +1,55 @@
 const API_BASE_URL = 'http://localhost:8080';
 
 const ROLE_ADMIN = 'ROLE_ADMIN';
-const ROLE_OPERATOR = 'ROLE_OPERADOR';
-const ROLE_DRIVER = 'ROLE_CONDUCTOR';
+const ROLE_OPERADOR = 'ROLE_OPERADOR';
+const ROLE_CONDUCTOR = 'ROLE_CONDUCTOR';
 
-const STATUS_LABELS = {
-    PENDIENTE: 'Pending',
-    EN_TRANSITO: 'In transit',
-    ENTREGADO: 'Delivered',
-    CANCELADO: 'Cancelled'
+const ESTADOS = {
+    PENDIENTE: 'Pendiente',
+    EN_TRANSITO: 'En tránsito',
+    ENTREGADO: 'Entregado',
+    CANCELADO: 'Cancelado'
 };
 
-const state = {
-    username: localStorage.getItem('username'),
-    roles: JSON.parse(localStorage.getItem('roles') || '[]'),
-    auditEntries: []
-};
+/* ===== Sesión (sessionStorage + JWT) ===== */
 
-/* ===== Session ===== */
-
-function redirectToLogin() {
-    localStorage.removeItem('jwt_token');
-    localStorage.removeItem('username');
-    localStorage.removeItem('roles');
-    localStorage.removeItem('token_expiration');
-    window.location.replace('login.html');
+function parseJwt(token) {
+    try {
+        const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const json = decodeURIComponent(atob(base64).split('')
+            .map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
+        return JSON.parse(json);
+    } catch (error) {
+        return null;
+    }
 }
 
-function hasAnyRole(...roles) {
-    return roles.some((role) => state.roles.includes(role));
+function clearSession() {
+    sessionStorage.removeItem('jwt_token');
+}
+
+function redirectToLogin() {
+    clearSession();
+    window.location.replace('index.html');
+}
+
+function getSession() {
+    const token = sessionStorage.getItem('jwt_token');
+    if (!token) return null;
+    const payload = parseJwt(token);
+    if (!payload || (payload.exp && payload.exp * 1000 < Date.now())) {
+        clearSession();
+        return null;
+    }
+    return { token, username: payload.sub, roles: Array.isArray(payload.roles) ? payload.roles : [] };
 }
 
 async function fetchWithAuth(path, options = {}) {
-    const token = localStorage.getItem('jwt_token');
+    const token = sessionStorage.getItem('jwt_token');
     if (!token) {
         redirectToLogin();
-        throw new Error('No active session');
+        throw new Error('Sin sesión activa');
     }
-
     const response = await fetch(`${API_BASE_URL}${path}`, {
         ...options,
         headers: {
@@ -46,27 +58,14 @@ async function fetchWithAuth(path, options = {}) {
             ...(options.headers || {})
         }
     });
-
     if (response.status === 401 || response.status === 403) {
         redirectToLogin();
-        throw new Error('Session expired or access denied');
+        throw new Error('Sesión expirada o acceso denegado');
     }
     return response;
 }
 
-async function readError(response) {
-    try {
-        const problem = await response.json();
-        if (Array.isArray(problem.errors) && problem.errors.length > 0) {
-            return problem.errors.map((item) => item.message).join('. ');
-        }
-        return problem.detail || problem.title || 'Unexpected error';
-    } catch (error) {
-        return 'Unexpected error';
-    }
-}
-
-/* ===== DOM helpers ===== */
+/* ===== Utilidades ===== */
 
 function el(tag, options = {}, children = []) {
     const node = document.createElement(tag);
@@ -78,117 +77,212 @@ function el(tag, options = {}, children = []) {
     return node;
 }
 
-function showMessage(text, isError = false) {
-    const box = document.getElementById('message');
-    box.textContent = text;
+// Extrae los mensajes de un JSON RFC 7807 (400, 404, 409, ...)
+async function readErrors(response) {
+    try {
+        const problem = await response.json();
+        if (Array.isArray(problem.errors) && problem.errors.length > 0) {
+            return problem.errors.map((item) => `${item.field}: ${item.message}`);
+        }
+        return [problem.detail || problem.title || `Error ${response.status}`];
+    } catch (error) {
+        return [`Error inesperado (${response.status})`];
+    }
+}
+
+function renderAlert(box, messages, isError) {
+    box.replaceChildren();
     box.className = `alert ${isError ? 'alert-error' : 'alert-success'}`;
+    if (messages.length === 1) {
+        box.textContent = messages[0];
+    } else {
+        box.appendChild(el('strong', { text: 'Se encontraron los siguientes errores:' }));
+        const list = el('ul');
+        messages.forEach((message) => list.appendChild(el('li', { text: message })));
+        box.appendChild(list);
+    }
+}
+
+function showMessage(messages, isError = false) {
+    const box = document.getElementById('message');
+    renderAlert(box, Array.isArray(messages) ? messages : [messages], isError);
     window.clearTimeout(showMessage.timer);
-    showMessage.timer = window.setTimeout(() => box.classList.add('hidden'), 6000);
+    showMessage.timer = window.setTimeout(() => { box.replaceChildren(); box.className = 'alert'; }, 8000);
+}
+
+async function showResponseError(response) {
+    showMessage(await readErrors(response), true);
 }
 
 function formatMoney(value) {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'CRC', maximumFractionDigits: 2 })
-        .format(value);
+    return new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC' }).format(value);
 }
 
-function statusLabel(status) {
-    return STATUS_LABELS[status] || status;
+const estadoLabel = (estado) => ESTADOS[estado] || estado;
+
+/* ===== Login (index.html) ===== */
+
+function initLogin() {
+    if (getSession()) {
+        window.location.replace('dashboard.html');
+        return;
+    }
+    const form = document.getElementById('loginForm');
+    const errorBox = document.getElementById('loginError');
+    const button = document.getElementById('loginButton');
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        errorBox.textContent = '';
+
+        const username = form.username.value.trim();
+        const password = form.password.value;
+        if (!username || !password) {
+            errorBox.textContent = 'El usuario y la contraseña son obligatorios';
+            return;
+        }
+
+        button.disabled = true;
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            if (!response.ok) {
+                errorBox.textContent = response.status === 401
+                    ? 'Usuario o contraseña incorrectos'
+                    : (await readErrors(response)).join('. ');
+                return;
+            }
+            const data = await response.json();
+            sessionStorage.setItem('jwt_token', data.token);
+            window.location.replace('dashboard.html');
+        } catch (error) {
+            errorBox.textContent = 'No se pudo conectar con el servidor. Verifique que el backend esté activo';
+        } finally {
+            button.disabled = false;
+        }
+    });
 }
 
-/* ===== Shipments ===== */
+/* ===== Dashboard (dashboard.html) ===== */
 
-function buildShipmentCard(shipment) {
-    const canChangeStatus = hasAnyRole(ROLE_ADMIN, ROLE_DRIVER);
-    const canManage = hasAnyRole(ROLE_ADMIN, ROLE_OPERATOR);
+const state = { session: null, shipments: [], filter: 'TODOS', auditEntries: [] };
+
+const hasAnyRole = (...roles) => roles.some((role) => state.session.roles.includes(role));
+
+function updateKpis() {
+    const active = new Set(state.shipments
+        .filter((s) => s.estadoEnvio === 'PENDIENTE' || s.estadoEnvio === 'EN_TRANSITO')
+        .map((s) => s.placaVehiculo));
+    document.getElementById('kpiTotal').textContent = state.shipments.length;
+    document.getElementById('kpiVehiculos').textContent = active.size;
+    document.getElementById('kpiEntregados').textContent =
+        state.shipments.filter((s) => s.estadoEnvio === 'ENTREGADO').length;
+}
+
+function buildCard(shipment) {
+    const isAdmin = hasAnyRole(ROLE_ADMIN);
+    const isOperator = hasAnyRole(ROLE_OPERADOR);
+    const isDriver = hasAnyRole(ROLE_CONDUCTOR);
     const actions = el('div', { className: 'card-actions' });
 
-    if (canChangeStatus && shipment.estadoEnvio === 'PENDIENTE') {
+    const canDispatch = isAdmin || isOperator;
+    const canDeliver = isAdmin || isDriver;
+
+    if (canDispatch && shipment.estadoEnvio === 'PENDIENTE') {
         actions.appendChild(el('button', {
-            className: 'btn btn-small', type: 'button', text: 'Mark in transit',
+            className: 'btn btn-small', type: 'button', text: 'Marcar en tránsito',
             onClick: () => changeStatus(shipment.id, 'EN_TRANSITO')
         }));
     }
-    if (canChangeStatus && shipment.estadoEnvio === 'EN_TRANSITO') {
+    if (canDeliver && shipment.estadoEnvio === 'EN_TRANSITO') {
         actions.appendChild(el('button', {
-            className: 'btn btn-small', type: 'button', text: 'Mark delivered',
+            className: 'btn btn-small', type: 'button', text: 'Marcar entregado',
             onClick: () => changeStatus(shipment.id, 'ENTREGADO')
         }));
     }
-    if (canManage && shipment.estadoEnvio === 'PENDIENTE') {
+    if ((isAdmin || isOperator) && shipment.estadoEnvio === 'PENDIENTE') {
         actions.appendChild(el('button', {
-            className: 'btn btn-small btn-danger', type: 'button', text: 'Cancel',
+            className: 'btn btn-small btn-danger', type: 'button', text: 'Cancelar',
             onClick: () => cancelShipment(shipment.id)
         }));
     }
-    if (canManage) {
+    if (isAdmin) {
         actions.appendChild(el('button', {
-            className: 'btn btn-small btn-secondary', type: 'button', text: 'View audit log',
-            onClick: () => openAuditModal(shipment)
+            className: 'btn btn-small btn-secondary', type: 'button', text: 'Ver bitácora',
+            onClick: () => openAudit(shipment)
         }));
     }
 
     const details = el('dl', {}, [
-        el('dt', { text: 'Destination' }), el('dd', { text: shipment.direccionDestino }),
-        el('dt', { text: 'Weight' }), el('dd', { text: `${shipment.pesoKg} kg` }),
-        el('dt', { text: 'Cost' }), el('dd', { text: formatMoney(shipment.costo) }),
-        el('dt', { text: 'Vehicle' }), el('dd', { text: shipment.placaVehiculo }),
-        el('dt', { text: 'Driver' }), el('dd', { text: shipment.nombreConductor })
+        el('dt', { text: 'Destino' }), el('dd', { text: shipment.direccionDestino }),
+        el('dt', { text: 'Peso' }), el('dd', { text: `${shipment.pesoKg} kg` }),
+        el('dt', { text: 'Costo' }), el('dd', { text: formatMoney(shipment.costo) }),
+        el('dt', { text: 'Vehículo' }), el('dd', { text: shipment.placaVehiculo }),
+        el('dt', { text: 'Conductor' }), el('dd', { text: shipment.nombreConductor })
     ]);
 
-    const header = el('div', { className: 'card-header' }, [
-        el('span', { className: 'card-title', text: shipment.codigoRastreo }),
-        el('span', { className: 'status-badge', text: statusLabel(shipment.estadoEnvio) })
+    const header = el('header', { className: 'card-header' }, [
+        el('h3', { className: 'card-title', text: shipment.codigoRastreo }),
+        el('span', { className: 'status-badge', text: estadoLabel(shipment.estadoEnvio) })
     ]);
 
-    return el('article', { className: `card ${shipment.estadoEnvio}` }, [header, details, actions]);
+    return el('article', { className: `card ${shipment.estadoEnvio}` }, [
+        el('div', {}, [header, details]), actions
+    ]);
+}
+
+function renderShipments() {
+    const grid = document.getElementById('enviosGrid');
+    grid.replaceChildren();
+    const visible = state.filter === 'TODOS'
+        ? state.shipments
+        : state.shipments.filter((s) => s.estadoEnvio === state.filter);
+    if (visible.length === 0) {
+        grid.appendChild(el('p', { className: 'empty-state', text: 'No hay envíos para mostrar.' }));
+        return;
+    }
+    visible.forEach((shipment) => grid.appendChild(buildCard(shipment)));
 }
 
 async function loadShipments() {
-    const container = document.getElementById('shipment-cards');
     try {
         const response = await fetchWithAuth('/api/envios/optimizados');
         if (!response.ok) {
-            showMessage(await readError(response), true);
+            await showResponseError(response);
             return;
         }
-        const shipments = await response.json();
-        container.replaceChildren();
-        if (shipments.length === 0) {
-            container.appendChild(el('p', { className: 'empty-state', text: 'No shipments registered yet.' }));
-            return;
-        }
-        shipments.forEach((shipment) => container.appendChild(buildShipmentCard(shipment)));
+        state.shipments = await response.json();
+        updateKpis();
+        renderShipments();
     } catch (error) {
-        if (!localStorage.getItem('jwt_token')) return;
-        showMessage('Cannot reach the server. Make sure the backend is running', true);
+        if (sessionStorage.getItem('jwt_token')) {
+            showMessage('No se pudo conectar con el servidor. Verifique que el backend esté activo', true);
+        }
     }
 }
 
 async function changeStatus(id, newStatus) {
-    const notes = window.prompt('Notes for the audit log (optional):', '');
+    const notes = window.prompt('Observaciones para la bitácora (opcional):', '');
     if (notes === null) return;
     const response = await fetchWithAuth(`/api/envios/${id}/estado`, {
         method: 'PATCH',
         body: JSON.stringify({ nuevoEstado: newStatus, observaciones: notes.trim() || null })
     });
-    if (!response.ok) {
-        showMessage(await readError(response), true);
-        return;
-    }
-    showMessage('Shipment status updated');
+    if (!response.ok) { await showResponseError(response); return; }
+    showMessage('Estado del envío actualizado');
     loadShipments();
 }
 
 async function cancelShipment(id) {
-    const notes = window.prompt('Reason for cancellation (optional):', '');
+    const notes = window.prompt('Motivo de la cancelación (opcional):', '');
     if (notes === null) return;
     const query = notes.trim() ? `?observaciones=${encodeURIComponent(notes.trim())}` : '';
     const response = await fetchWithAuth(`/api/envios/${id}/cancelar${query}`, { method: 'PATCH' });
-    if (!response.ok) {
-        showMessage(await readError(response), true);
-        return;
-    }
-    showMessage('Shipment cancelled');
+    if (!response.ok) { await showResponseError(response); return; }
+    showMessage('Envío cancelado');
     loadShipments();
 }
 
@@ -196,15 +290,12 @@ async function estimateFee() {
     const weight = document.getElementById('weightKg').value;
     const distance = document.getElementById('distanceKm').value;
     if (!weight || !distance) {
-        showMessage('Enter weight and distance to estimate the fee', true);
+        showMessage('Ingrese peso y distancia para estimar la tarifa', true);
         return;
     }
     const query = `?pesoKg=${encodeURIComponent(weight)}&distanciaKm=${encodeURIComponent(distance)}`;
     const response = await fetchWithAuth(`/api/envios/tarifa${query}`);
-    if (!response.ok) {
-        showMessage(await readError(response), true);
-        return;
-    }
+    if (!response.ok) { await showResponseError(response); return; }
     const data = await response.json();
     document.getElementById('cost').value = data.tarifa.toFixed(2);
 }
@@ -220,64 +311,53 @@ async function createShipment(event) {
         conductorId: parseInt(document.getElementById('driverId').value, 10)
     };
     const response = await fetchWithAuth('/api/envios', { method: 'POST', body: JSON.stringify(payload) });
-    if (!response.ok) {
-        showMessage(await readError(response), true);
-        return;
-    }
+    if (!response.ok) { await showResponseError(response); return; }
     event.target.reset();
-    showMessage('Shipment created');
+    showMessage('Envío creado correctamente');
     loadShipments();
 }
 
-/* ===== Audit log modal ===== */
+/* ----- Bitácora (aside, solo ADMIN) ----- */
 
-function renderAuditRows() {
-    const from = document.getElementById('audit-from').value;
-    const to = document.getElementById('audit-to').value;
-    const rows = document.getElementById('audit-rows');
-    rows.replaceChildren();
+function renderAudit() {
+    const from = document.getElementById('auditFrom').value;
+    const to = document.getElementById('auditTo').value;
+    const list = document.getElementById('auditList');
+    list.replaceChildren();
 
     const filtered = state.auditEntries.filter((entry) => {
         const day = entry.fechaCambio.slice(0, 10);
         return (!from || day >= from) && (!to || day <= to);
     });
-
-    document.getElementById('audit-empty').classList.toggle('hidden', filtered.length > 0);
+    document.getElementById('auditEmpty').classList.toggle('hidden', filtered.length > 0);
 
     filtered.forEach((entry) => {
-        const change = el('td', {}, [
-            el('span', { text: statusLabel(entry.estadoAnterior) }),
-            el('span', { className: 'arrow', text: '\u2192' }),
-            el('span', { text: statusLabel(entry.estadoNuevo) })
-        ]);
-        rows.appendChild(el('tr', {}, [
-            change,
-            el('td', { text: new Date(entry.fechaCambio).toLocaleString() }),
-            el('td', { text: entry.usuario }),
-            el('td', { text: entry.observaciones || '-' })
+        list.appendChild(el('li', {}, [
+            el('div', { className: 'audit-change' }, [
+                el('span', { text: estadoLabel(entry.estadoAnterior) }),
+                el('span', { className: 'arrow', text: '\u2192' }),
+                el('span', { text: estadoLabel(entry.estadoNuevo) })
+            ]),
+            el('div', { className: 'audit-meta', text: `${new Date(entry.fechaCambio).toLocaleString('es-CR')} · ${entry.usuario}` }),
+            el('div', { text: entry.observaciones || 'Sin observaciones' })
         ]));
     });
 }
 
-async function openAuditModal(shipment) {
+async function openAudit(shipment) {
     const response = await fetchWithAuth(`/api/envios/${shipment.id}/bitacora`);
-    if (!response.ok) {
-        showMessage(await readError(response), true);
-        return;
-    }
+    if (!response.ok) { await showResponseError(response); return; }
     state.auditEntries = await response.json();
-    document.getElementById('audit-title').textContent = `Audit log - ${shipment.codigoRastreo}`;
-    document.getElementById('audit-from').value = '';
-    document.getElementById('audit-to').value = '';
-    renderAuditRows();
-    document.getElementById('audit-modal').classList.remove('hidden');
+    document.getElementById('auditTitle').textContent = `Bitácora - ${shipment.codigoRastreo}`;
+    document.getElementById('auditFrom').value = '';
+    document.getElementById('auditTo').value = '';
+    document.getElementById('auditHint').classList.add('hidden');
+    document.getElementById('auditContent').classList.remove('hidden');
+    renderAudit();
+    document.getElementById('auditAside').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function closeAuditModal() {
-    document.getElementById('audit-modal').classList.add('hidden');
-}
-
-/* ===== Fleet ===== */
+/* ----- Flota (solo ADMIN) ----- */
 
 async function loadFleet() {
     const [vehiclesResponse, companiesResponse] = await Promise.all([
@@ -285,23 +365,23 @@ async function loadFleet() {
         fetchWithAuth('/api/empresas')
     ]);
     if (!vehiclesResponse.ok || !companiesResponse.ok) {
-        showMessage(await readError(vehiclesResponse.ok ? companiesResponse : vehiclesResponse), true);
+        await showResponseError(vehiclesResponse.ok ? companiesResponse : vehiclesResponse);
         return;
     }
     const vehicles = await vehiclesResponse.json();
     const companies = await companiesResponse.json();
 
-    const vehicleRows = document.getElementById('vehicle-rows');
+    const vehicleRows = document.getElementById('vehicleRows');
     vehicleRows.replaceChildren();
     vehicles.forEach((vehicle) => {
         const actions = el('td', {}, [
             el('button', {
-                className: 'btn btn-small btn-secondary', type: 'button', text: 'Assign driver',
+                className: 'btn btn-small btn-secondary', type: 'button', text: 'Asignar conductor',
                 onClick: () => assignDriver(vehicle.id)
             }),
             document.createTextNode(' '),
             el('button', {
-                className: 'btn btn-small btn-danger', type: 'button', text: 'Delete',
+                className: 'btn btn-small btn-danger', type: 'button', text: 'Eliminar',
                 onClick: () => deleteVehicle(vehicle.id)
             })
         ]);
@@ -311,21 +391,19 @@ async function loadFleet() {
             el('td', { text: `${vehicle.marca} ${vehicle.modelo}` }),
             el('td', { text: vehicle.capacidadKg }),
             el('td', { text: vehicle.nombreEmpresa }),
-            el('td', { text: vehicle.nombreConductor || 'Unassigned' }),
+            el('td', { text: vehicle.nombreConductor || 'Sin asignar' }),
             actions
         ]));
     });
 
-    const companyRows = document.getElementById('company-rows');
+    const companyRows = document.getElementById('companyRows');
     companyRows.replaceChildren();
-    companies.forEach((company) => {
-        companyRows.appendChild(el('tr', {}, [
-            el('td', { text: company.id }),
-            el('td', { text: company.nombre }),
-            el('td', { text: company.cedulaJuridica }),
-            el('td', { text: company.telefono || '-' })
-        ]));
-    });
+    companies.forEach((company) => companyRows.appendChild(el('tr', {}, [
+        el('td', { text: company.id }),
+        el('td', { text: company.nombre }),
+        el('td', { text: company.cedulaJuridica }),
+        el('td', { text: company.telefono || '-' })
+    ])));
 }
 
 async function createVehicle(event) {
@@ -338,91 +416,86 @@ async function createVehicle(event) {
         empresaId: parseInt(document.getElementById('companyId').value, 10)
     };
     const response = await fetchWithAuth('/api/vehiculos', { method: 'POST', body: JSON.stringify(payload) });
-    if (!response.ok) {
-        showMessage(await readError(response), true);
-        return;
-    }
+    if (!response.ok) { await showResponseError(response); return; }
     event.target.reset();
-    showMessage('Vehicle registered');
+    showMessage('Vehículo registrado');
     loadFleet();
 }
 
 async function assignDriver(vehicleId) {
-    const value = window.prompt('Driver ID to assign:', '');
+    const value = window.prompt('ID del conductor a asignar:', '');
     if (value === null || value.trim() === '') return;
     const response = await fetchWithAuth(`/api/vehiculos/${vehicleId}/conductor`, {
         method: 'PATCH',
         body: JSON.stringify({ conductorId: parseInt(value, 10) })
     });
-    if (!response.ok) {
-        showMessage(await readError(response), true);
-        return;
-    }
-    showMessage('Driver assigned');
+    if (!response.ok) { await showResponseError(response); return; }
+    showMessage('Conductor asignado');
     loadFleet();
 }
 
 async function deleteVehicle(vehicleId) {
-    if (!window.confirm('Delete this vehicle?')) return;
+    if (!window.confirm('¿Eliminar este vehículo?')) return;
     const response = await fetchWithAuth(`/api/vehiculos/${vehicleId}`, { method: 'DELETE' });
-    if (!response.ok) {
-        showMessage(await readError(response), true);
-        return;
-    }
-    showMessage('Vehicle deleted');
+    if (!response.ok) { await showResponseError(response); return; }
+    showMessage('Vehículo eliminado');
     loadFleet();
 }
 
-/* ===== Tabs and bootstrap ===== */
-
-function switchTab(tab) {
-    document.querySelectorAll('.tab').forEach((button) =>
-        button.classList.toggle('active', button.dataset.tab === tab));
-    document.getElementById('section-shipments').classList.toggle('hidden', tab !== 'shipments');
-    document.getElementById('section-fleet').classList.toggle('hidden', tab !== 'fleet');
-    if (tab === 'fleet') loadFleet();
-}
+/* ----- Arranque ----- */
 
 function applyRoleView() {
-    document.getElementById('user-name').textContent = state.username;
-    const rolesBox = document.getElementById('user-roles');
-    state.roles.forEach((role) =>
+    document.getElementById('userName').textContent = state.session.username;
+    const rolesBox = document.getElementById('userRoles');
+    state.session.roles.forEach((role) =>
         rolesBox.appendChild(el('span', { className: 'role-badge', text: role.replace('ROLE_', '') })));
 
-    if (hasAnyRole(ROLE_ADMIN, ROLE_OPERATOR)) {
-        document.getElementById('create-panel').classList.remove('hidden');
+    if (hasAnyRole(ROLE_ADMIN, ROLE_OPERADOR)) {
+        document.getElementById('createSection').classList.remove('hidden');
     }
     if (hasAnyRole(ROLE_ADMIN)) {
-        document.getElementById('tab-fleet').classList.remove('hidden');
+        document.getElementById('fleetSection').classList.remove('hidden');
+        document.getElementById('auditAside').classList.remove('hidden');
+        document.getElementById('layout').classList.add('has-aside');
+        loadFleet();
     }
 }
 
-function init() {
-    if (!localStorage.getItem('jwt_token')) {
+function initDashboard() {
+    state.session = getSession();
+    if (!state.session) {
         redirectToLogin();
         return;
     }
     applyRoleView();
 
-    document.getElementById('logout-button').addEventListener('click', redirectToLogin);
-    document.getElementById('shipment-form').addEventListener('submit', createShipment);
-    document.getElementById('estimate-button').addEventListener('click', estimateFee);
-    document.getElementById('vehicle-form').addEventListener('submit', createVehicle);
-    document.getElementById('audit-close').addEventListener('click', closeAuditModal);
-    document.getElementById('audit-from').addEventListener('change', renderAuditRows);
-    document.getElementById('audit-to').addEventListener('change', renderAuditRows);
-    document.getElementById('audit-clear').addEventListener('click', () => {
-        document.getElementById('audit-from').value = '';
-        document.getElementById('audit-to').value = '';
-        renderAuditRows();
+    document.getElementById('logoutButton').addEventListener('click', redirectToLogin);
+    document.getElementById('shipmentForm').addEventListener('submit', createShipment);
+    document.getElementById('estimateButton').addEventListener('click', estimateFee);
+    document.getElementById('vehicleForm').addEventListener('submit', createVehicle);
+    document.getElementById('auditFrom').addEventListener('change', renderAudit);
+    document.getElementById('auditTo').addEventListener('change', renderAudit);
+    document.getElementById('auditClear').addEventListener('click', () => {
+        document.getElementById('auditFrom').value = '';
+        document.getElementById('auditTo').value = '';
+        renderAudit();
     });
-    document.getElementById('audit-modal').addEventListener('click', (event) => {
-        if (event.target.id === 'audit-modal') closeAuditModal();
-    });
-    document.querySelectorAll('.tab').forEach((button) =>
-        button.addEventListener('click', () => switchTab(button.dataset.tab)));
+    document.querySelectorAll('.filter-btn').forEach((button) =>
+        button.addEventListener('click', () => {
+            state.filter = button.dataset.filter;
+            document.querySelectorAll('.filter-btn').forEach((b) => {
+                const active = b === button;
+                b.classList.toggle('active', active);
+                b.setAttribute('aria-pressed', String(active));
+            });
+            renderShipments();
+        }));
 
     loadShipments();
 }
 
-init();
+if (document.body.dataset.page === 'login') {
+    initLogin();
+} else {
+    initDashboard();
+}

@@ -212,14 +212,37 @@ class EnvioServiceTest {
     }
 
     @Test
+    void listarOptimizados_ConductorSoloVeSusEnvios() {
+        Envio propio = envio("PENDIENTE");
+        Envio ajeno = envio("EN_TRANSITO");
+        Conductor otro = conductor(true);
+        otro.setNombreCompleto("Ana Mora");
+        ajeno.setConductor(otro);
+
+        Usuario driverUser = usuario("conductor1");
+        driverUser.setNombreCompleto("Mario Rojas");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("conductor1", null,
+                        List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "ROLE_CONDUCTOR"))));
+        when(envioRepository.findAllOptimized()).thenReturn(List.of(propio, ajeno));
+        when(usuarioRepository.findByUsername("conductor1")).thenReturn(Optional.of(driverUser));
+
+        List<EnvioResponseDTO> result = envioService.listarOptimizados();
+
+        assertEquals(1, result.size());
+        assertEquals("Mario Rojas", result.get(0).nombreConductor());
+    }
+
+    @Test
     void actualizarEstado_TransicionValida_RegistraBitacora() {
         authenticateAs("operator");
         when(envioRepository.findDetailedById(10)).thenReturn(Optional.of(envio("PENDIENTE")));
         when(usuarioRepository.findByUsername("operator")).thenReturn(Optional.of(usuario("operator")));
         when(envioRepository.save(any(Envio.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        EnvioResponseDTO result =
-                envioService.actualizarEstado(10, new CambioEstadoDTO("EN_TRANSITO", "Left the warehouse"));
+        EnvioResponseDTO result = envioService.actualizarEstado(10,
+                new CambioEstadoDTO("EN_TRANSITO", "Left the warehouse"));
 
         assertEquals("EN_TRANSITO", result.estadoEnvio());
         ArgumentCaptor<BitacoraEnvio> captor = ArgumentCaptor.forClass(BitacoraEnvio.class);
@@ -329,9 +352,9 @@ class EnvioServiceTest {
 
     @ParameterizedTest
     @CsvSource({
-        "5.0, 10.0, 2500.0",
-        "15.0, 50.0, 7500.0",
-        "100.0, 2.5, 12000.0"
+            "5.0, 10.0, 2500.0",
+            "15.0, 50.0, 7500.0",
+            "100.0, 2.5, 12000.0"
     })
     @DisplayName("Debe calcular la tarifa correcta segun peso y distancia")
     void calcularTarifa_CasosVariados_CalculaCorrectamente(
@@ -343,8 +366,8 @@ class EnvioServiceTest {
 
     @ParameterizedTest
     @CsvSource({
-        "50.0, 10.0, 20500.0",
-        "50.01, 10.0, 8001.10"
+            "50.0, 10.0, 20500.0",
+            "50.01, 10.0, 8001.10"
     })
     @DisplayName("Applies the heavy tariff only above the 50 kg threshold")
     void calcularTarifa_LimiteDePeso_AplicaTarifaCorrecta(double pesoKg, double distanciaKm, double tarifaEsperada) {
@@ -353,10 +376,10 @@ class EnvioServiceTest {
 
     @ParameterizedTest
     @CsvSource({
-        "0.0, 10.0",
-        "5.0, 0.0",
-        "-1.0, 5.0",
-        "5.0, -3.0"
+            "0.0, 10.0",
+            "5.0, 0.0",
+            "-1.0, 5.0",
+            "5.0, -3.0"
     })
     @DisplayName("Rejects non positive weight or distance")
     void calcularTarifa_ValoresInvalidos_LanzaExcepcion(double pesoKg, double distanciaKm) {

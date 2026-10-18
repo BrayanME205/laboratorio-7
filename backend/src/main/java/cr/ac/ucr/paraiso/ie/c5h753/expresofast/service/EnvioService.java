@@ -94,7 +94,25 @@ public class EnvioService {
 
     @Transactional(readOnly = true)
     public List<EnvioResponseDTO> listarOptimizados() {
-        return envioRepository.findAllOptimized().stream().map(EnvioResponseDTO::from).toList();
+        List<EnvioResponseDTO> all = envioRepository.findAllOptimized().stream()
+                .map(EnvioResponseDTO::from).toList();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!isDriverOnly(authentication)) {
+            return all;
+        }
+        String driverName = usuarioRepository.findByUsername(authentication.getName())
+                .map(Usuario::getNombreCompleto).orElse("");
+        return all.stream().filter(e -> driverName.equals(e.nombreConductor())).toList();
+    }
+
+    private static boolean isDriverOnly(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        List<String> roles = authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority()).toList();
+        return roles.contains("ROLE_CONDUCTOR")
+                && !roles.contains("ROLE_ADMIN") && !roles.contains("ROLE_OPERADOR");
     }
 
     @Transactional
