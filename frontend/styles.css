@@ -526,6 +526,54 @@ th {
     margin: 0.25rem 0;
 }
 
+/* ===== Paginación (lab 9) ===== */
+a.btn {
+    display: inline-block;
+    text-decoration: none;
+}
+
+.field select {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-input);
+    color: var(--text-main);
+}
+
+.field select:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.muted {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-top: 0;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.pager-info {
+    padding: 0 0.75rem;
+    font-weight: 600;
+}
+
 /* ===== Responsivo ===== */
 @media (max-width: 900px) {
     .layout.has-aside {
@@ -565,6 +613,14 @@ th {
     }
 
     .form-actions .btn {
+        width: 100%;
+    }
+
+    .pager {
+        flex-direction: column;
+    }
+
+    .pager .btn {
         width: 100%;
     }
 }

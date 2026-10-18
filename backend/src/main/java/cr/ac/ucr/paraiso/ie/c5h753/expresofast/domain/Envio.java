@@ -28,6 +28,9 @@ public class Envio {
     @Column(name = "codigo_rastreo", nullable = false, unique = true, length = 20)
     private String codigoRastreo;
 
+    @Column(name = "destinatario", length = 100)
+    private String destinatario;
+
     @Column(name = "direccion_destino", nullable = false, length = 250)
     private String direccionDestino;
 

@@ -27,6 +27,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import cr.ac.ucr.paraiso.ie.c5h753.expresofast.dto.EnvioDTO;
+import cr.ac.ucr.paraiso.ie.c5h753.expresofast.dto.MetricaEstadoDTO;
+import java.math.BigDecimal;
+import java.util.Map;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @Service
 public class EnvioService {
@@ -38,6 +46,15 @@ public class EnvioService {
     private static final double HEAVY_BASE_FEE = 500.0;
     private static final double HEAVY_RATE_PER_KG = 110.0;
     private static final double HEAVY_RATE_PER_KM = 200.0;
+    private static final int MAX_PAGE_SIZE = 100;
+    private static final Map<String, String> SORT_FIELDS = Map.of(
+            "id", "id",
+            "codigoRastreo", "codigoRastreo",
+            "destinatario", "destinatario",
+            "direccionDestino", "direccionDestino",
+            "montoFlete", "costo",
+            "estado", "estadoEnvio",
+            "fechaCreacion", "fechaCreacion");
 
     private final EnvioRepository envioRepository;
     private final VehiculoRepository vehiculoRepository;
@@ -103,6 +120,41 @@ public class EnvioService {
         String driverName = usuarioRepository.findByUsername(authentication.getName())
                 .map(Usuario::getNombreCompleto).orElse("");
         return all.stream().filter(e -> driverName.equals(e.nombreConductor())).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<EnvioDTO> listarPaginado(
+            int page, int size, String sortBy, String dir, String busqueda, String estado) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        String field = SORT_FIELDS.getOrDefault(sortBy == null ? "" : sortBy, "fechaCreacion");
+        Sort.Direction direction = "asc".equalsIgnoreCase(dir) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(direction, field));
+
+        String state = (estado == null || estado.isBlank()) ? "" : normalizarEstado(estado);
+        String term = busqueda == null ? "" : busqueda.trim();
+        return envioRepository.buscar(state, term, pageable).map(EnvioDTO::from);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EnvioDTO> listarViaStoredProcedure(String estado) {
+        return envioRepository.obtenerPorEstado(normalizarEstado(estado)).stream()
+                .map(EnvioDTO::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MetricaEstadoDTO> resumenMetricas() {
+        return envioRepository.resumenMetricas().stream()
+                .map(row -> new MetricaEstadoDTO(
+                        (String) row[0],
+                        ((Number) row[1]).longValue(),
+                        new BigDecimal(row[2].toString())))
+                .toList();
+    }
+
+    private static String normalizarEstado(String estado) {
+        return EstadoEnvio.from(estado == null ? "" : estado.trim().toUpperCase()).name();
     }
 
     private static boolean isDriverOnly(Authentication authentication) {

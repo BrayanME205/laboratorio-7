@@ -46,6 +46,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import static org.mockito.ArgumentMatchers.eq;
+import cr.ac.ucr.paraiso.ie.c5h753.expresofast.dto.EnvioDTO;
+import cr.ac.ucr.paraiso.ie.c5h753.expresofast.dto.MetricaEstadoDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @ExtendWith(MockitoExtension.class)
 class EnvioServiceTest {
@@ -384,5 +391,65 @@ class EnvioServiceTest {
     @DisplayName("Rejects non positive weight or distance")
     void calcularTarifa_ValoresInvalidos_LanzaExcepcion(double pesoKg, double distanciaKm) {
         assertThrows(IllegalArgumentException.class, () -> envioService.calcularTarifa(pesoKg, distanciaKm));
+    }
+
+    @Test
+    void listarPaginado_ConstruyePageRequestYMapeaDTO() {
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        when(envioRepository.buscar(eq("PENDIENTE"), eq("exp"), captor.capture()))
+                .thenReturn(new PageImpl<>(List.of(envio("PENDIENTE"))));
+
+        Page<EnvioDTO> result = envioService.listarPaginado(2, 10, "montoFlete", "asc", " exp ", "pendiente");
+
+        assertEquals(1, result.getContent().size());
+        assertEquals(2, captor.getValue().getPageNumber());
+        assertEquals(10, captor.getValue().getPageSize());
+        assertEquals(Sort.Direction.ASC, captor.getValue().getSort().getOrderFor("costo").getDirection());
+    }
+
+    @Test
+    void listarPaginado_ParametrosInvalidos_UsaValoresSeguros() {
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        when(envioRepository.buscar(eq(""), eq(""), captor.capture())).thenReturn(Page.empty());
+
+        envioService.listarPaginado(-3, 500, "hack;DROP", null, null, null);
+
+        assertEquals(0, captor.getValue().getPageNumber());
+        assertEquals(100, captor.getValue().getPageSize());
+        assertEquals(Sort.Direction.DESC,
+                captor.getValue().getSort().getOrderFor("fechaCreacion").getDirection());
+    }
+
+    @Test
+    void listarPaginado_EstadoInvalido_LanzaExcepcion() {
+        assertThrows(BusinessRuleException.class,
+                () -> envioService.listarPaginado(0, 5, "id", "asc", null, "VOLANDO"));
+    }
+
+    @Test
+    void listarViaStoredProcedure_EstadoValido_RetornaDTOs() {
+        when(envioRepository.obtenerPorEstado("ENTREGADO")).thenReturn(List.of(envio("ENTREGADO")));
+
+        List<EnvioDTO> result = envioService.listarViaStoredProcedure("entregado");
+
+        assertEquals(1, result.size());
+        assertEquals("ENTREGADO", result.get(0).estado());
+    }
+
+    @Test
+    void listarViaStoredProcedure_EstadoInvalido_LanzaExcepcion() {
+        assertThrows(BusinessRuleException.class, () -> envioService.listarViaStoredProcedure("XYZ"));
+    }
+
+    @Test
+    void resumenMetricas_MapeaFilasDelProcedimiento() {
+        when(envioRepository.resumenMetricas())
+                .thenReturn(List.<Object[]>of(new Object[] { "PENDIENTE", 3, new BigDecimal("15000.50") }));
+
+        List<MetricaEstadoDTO> result = envioService.resumenMetricas();
+
+        assertEquals(1, result.size());
+        assertEquals(3L, result.get(0).total());
+        assertEquals(new BigDecimal("15000.50"), result.get(0).sumaFlete());
     }
 }

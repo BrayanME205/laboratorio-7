@@ -5,7 +5,7 @@ Carrera de Informática Empresarial
 **Curso:** IF0009 – Desarrollo de Software IV
 **Profesor:** Mag. Jonathan Granados C.
 **Semestre:** II-2026
-**Laboratorios:** 6, 7 y 8 
+**Laboratorios:** 6, 7, 8 y 9
 **Estudiante:** Brayan Murillo Estrada
 **Carné:** c5h753
 
@@ -34,6 +34,7 @@ expresofast-lab6-c5h753/
 │   ├── 01_schema_lab5.sql
 │   ├── 02_schema_lab6_extension.sql
 │   └── 03_data_seeds.sql
+|   └── 04_lab9_procedures.sql
 ├── frontend/           Portal web (HTML, CSS, JS)
 ├── docs/               Colección Postman y script de commits
 └── README.md
@@ -49,12 +50,7 @@ Desde SSMS o `sqlcmd`, ejecute en orden:
 1. `database/01_schema_lab5.sql` – crea la base `ExpresoFastc5h753_II2026` y las tablas del dominio.
 2. `database/02_schema_lab6_extension.sql` – crea `Usuario`, `Rol`, `UsuarioRol` y `BitacoraEnvio`.
 3. `database/03_data_seeds.sql` – inserta roles, usuarios (contraseñas con BCrypt), empresas, conductores, vehículos y envíos de ejemplo.
-
-```bash
-sqlcmd -S localhost -U sa -P "<password>" -i database/01_schema_lab5.sql
-sqlcmd -S localhost -U sa -P "<password>" -i database/02_schema_lab6_extension.sql
-sqlcmd -S localhost -U sa -P "<password>" -i database/03_data_seeds.sql
-```
+4. `database/04_lab9_procedures.sql` 
 
 ### Credenciales de conexión
 
@@ -97,8 +93,7 @@ cd frontend
 python -m http.server 5500
 ```
 
-Abra `http://127.0.0.1:5500/index.html`. (También funciona con la extensión Live Server de VS Code.)
-La URL del backend se configura en la constante `API_BASE_URL` de `app.js` y `login.html`.
+Abra `http://127.0.0.1:5500/dashboard_paginado.html`. (También funciona con la extensión Live Server de VS Code.)
 
 ## 6. Matriz de permisos (RBAC)
 
@@ -129,7 +124,7 @@ Matriz de tarifas (`EnvioService.calcularTarifa`):
 ```bash
 cd backend
 mvn clean test       # ejecuta la suite completa y genera el reporte JaCoCo
-mvn clean verify     # además exige >= 85% de cobertura de instrucciones en el paquete service
+mvn clean verify     
 ```
 
 Reporte visual de cobertura: `backend/target/site/jacoco/index.html`

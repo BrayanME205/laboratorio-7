@@ -452,6 +452,7 @@ function applyRoleView() {
 
     if (hasAnyRole(ROLE_ADMIN, ROLE_OPERADOR)) {
         document.getElementById('createSection').classList.remove('hidden');
+        document.getElementById('paginadoLink').classList.remove('hidden');
     }
     if (hasAnyRole(ROLE_ADMIN)) {
         document.getElementById('fleetSection').classList.remove('hidden');
@@ -494,8 +495,9 @@ function initDashboard() {
     loadShipments();
 }
 
-if (document.body.dataset.page === 'login') {
+const CURRENT_PAGE = document.body.dataset.page;
+if (CURRENT_PAGE === 'login') {
     initLogin();
-} else {
+} else if (CURRENT_PAGE === 'dashboard') {
     initDashboard();
 }

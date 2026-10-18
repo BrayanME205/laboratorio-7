@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExpresoFast - Consola paginada</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body data-page="paginado">
+    <a class="skip-link" href="#tablaEnvios">Saltar a la tabla</a>
+
+    <header class="topbar">
+        <h1 class="logo">Expreso<span>Fast</span></h1>
+        <div class="topbar-user">
+            <a class="btn btn-secondary btn-small" href="dashboard.html">Volver al tablero</a>
+            <span id="userName" class="user-name"></span>
+            <span id="userRoles"></span>
+            <button id="logoutButton" class="btn btn-secondary btn-small" type="button">Cerrar sesión</button>
+        </div>
+    </header>
+
+    <main class="layout">
+        <div class="main-content">
+            <div id="message" class="alert" role="status" aria-live="polite"></div>
+
+            <section class="panel" aria-labelledby="filtrosTitle">
+                <h2 id="filtrosTitle">Filtros de búsqueda</h2>
+                <form id="filtrosForm" novalidate>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="busqueda">Buscar (rastreo, destinatario o dirección)</label>
+                            <input id="busqueda" type="search" placeholder="Ej: EXP-2001 o Laura">
+                        </div>
+                        <div class="field">
+                            <label for="estadoFiltro">Estado</label>
+                            <select id="estadoFiltro">
+                                <option value="">Todos</option>
+                                <option value="PENDIENTE">Pendiente</option>
+                                <option value="EN_TRANSITO">En tránsito</option>
+                                <option value="ENTREGADO">Entregado</option>
+                                <option value="CANCELADO">Cancelado</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="sortBy">Ordenar por</label>
+                            <select id="sortBy">
+                                <option value="fechaCreacion">Fecha de creación</option>
+                                <option value="codigoRastreo">Código de rastreo</option>
+                                <option value="destinatario">Destinatario</option>
+                                <option value="montoFlete">Flete</option>
+                                <option value="estado">Estado</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="direction">Dirección</label>
+                            <select id="direction">
+                                <option value="desc">Descendente</option>
+                                <option value="asc">Ascendente</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="pageSize">Envíos por página</label>
+                            <select id="pageSize">
+                                <option value="5" selected>5</option>
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="procedimiento">Procedimiento almacenado</label>
+                            <select id="procedimiento">
+                                <option value="">Consulta paginada (sin procedimiento)</option>
+                                <option value="PENDIENTE">SP: envíos pendientes</option>
+                                <option value="EN_TRANSITO">SP: envíos en tránsito</option>
+                                <option value="ENTREGADO">SP: envíos entregados</option>
+                                <option value="CANCELADO">SP: envíos cancelados</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn" type="submit">Aplicar</button>
+                        <button id="limpiarButton" class="btn btn-secondary" type="button">Limpiar</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="panel" aria-labelledby="tablaTitle">
+                <h2 id="tablaTitle">Guías de envío</h2>
+                <p id="origenDatos" class="muted"></p>
+                <div class="table-wrap">
+                    <table id="tablaEnvios">
+                        <caption class="sr-only">Listado de guías de envío</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Rastreo</th>
+                                <th scope="col">Destinatario</th>
+                                <th scope="col">Dirección</th>
+                                <th scope="col">Flete</th>
+                                <th scope="col">Estado</th>
+                                <th scope="col">Creado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="enviosBody"></tbody>
+                    </table>
+                </div>
+
+                <nav id="paginador" class="pager" aria-label="Paginación de envíos">
+                    <button id="btnPrimera" class="btn btn-secondary btn-small" type="button">&laquo; Primera</button>
+                    <button id="btnAnterior" class="btn btn-secondary btn-small" type="button">&lsaquo;
+                        Anterior</button>
+                    <span id="paginaInfo" class="pager-info" aria-live="polite"></span>
+                    <button id="btnSiguiente" class="btn btn-secondary btn-small" type="button">Siguiente
+                        &rsaquo;</button>
+                    <button id="btnUltima" class="btn btn-secondary btn-small" type="button">Última &raquo;</button>
+                </nav>
+            </section>
+
+            <section class="panel" aria-labelledby="metricasTitle">
+                <h2 id="metricasTitle">Resumen por estado (SP_RESUMEN_METRICAS_ENVIOS)</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col">Estado</th>
+                                <th scope="col">Total de envíos</th>
+                                <th scope="col">Suma de fletes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metricasBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 ExpresoFast. Universidad de Costa Rica, Sede del Atlántico.</p>
+    </footer>
+
+    <script src="app.js"></script>
+    <script src="paginado.js"></script>
+</body>
+
+</html>
